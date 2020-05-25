@@ -7,7 +7,7 @@ using LinearAlgebra, LuxurySparse, SparseArrays, Random
 using Printf
 
 export QuantumChemistrySystem, HubbardModel, Mole
-export SelfConsistentField
+export SelfConsistentField, kernel!
 
 include("./libqcsys/qcsys.jl")
 include("./libscf/scf.jl")
