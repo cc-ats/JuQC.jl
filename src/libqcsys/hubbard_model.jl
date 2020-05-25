@@ -16,9 +16,13 @@ function get_nuclear_energy(hm::HubbardModel)
     return 0.0
 end
 
-function get_mo_occ(hm::HubbardModel)
-    occ = ones(Integer, hm.dim)
-    return occ
+function get_mo_occ(hm::HubbardModel; orbtype::String="RHF")
+    if orbtype == "RHF"
+        occ = ones(Integer, hm.dim)
+        return occ
+    elseif orbtype == "UHF"
+        error("UHF not implemented yet!")
+    end
 end
 
 function get_dimension(hm::HubbardModel)
