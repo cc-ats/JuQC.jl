@@ -1,13 +1,15 @@
 abstract type FockBuilder end
 
-struct RestrictedFockBuilder{T} <: ObjectiveFunction
+struct RestrictedFockBuilder{T} <: FockBuilder
     _ovlp ::Array{T, 2}
     _hcore::Array{T, 2}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-abstract type SCFSolver end 
-mutable struct RestrictedSCFSolver{T} <: SCFSolver
+abstract type SCFSolver{T} <: ObjectiveFunction{T} end 
+mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
+    _is_converged::Bool
+
     _nelec::Integer
     _nocc ::Integer
     _nao  ::Integer
@@ -17,7 +19,6 @@ mutable struct RestrictedSCFSolver{T} <: SCFSolver
     _orb_coeff     ::Array{T, 2}
     _orb_coeff_inv ::Array{T, 2}
     _density_matrix::Array{T, 2}
-
     _guess_method  ::InitGuessMethod
     _fock_builder  ::RestrictedFockBuilder{T}
 end
@@ -58,9 +59,10 @@ function build_density_matrix(the_scf::RestrictedRestrictedSCFSolver{T}, orb_coe
     co = get
 end
 
-function get_fock(the_scf::RestrictedRestrictedSCFSolver{T}, dm::Array{T, 2}) where {T}
+function build_fock_matrix(the_scf::RestrictedRestrictedSCFSolver{T}, dm::Array{T, 2}) where {T}
+    nao = get_nao(the_scf)
     
-    jmat = Array{T, 2}(undef, )
+    jmat = Array{T, 2}(undef, nao, nao)
 end
 
 struct UnrestrictedRestrictedSCFSolver{T}
@@ -110,6 +112,29 @@ function get_vir_index(the_scf::UnrestrictedUnrestrictedSCFSolver)
     return ((the_scf._nocc[1]+1):(the_scf._nmo), (the_scf._nocc[2]+1):(the_scf._nmo))::Tuple{UnitRange{Integer},UnitRange{Integer}}
 end
 
-function kernel()
+function kernel!(the_scf::SCFSolver{T}; max_iter::Integer=100, tol::Number=1e-8)
     
+    the_optimizer::OptimizationAlgorithm{T} = algorithm_selection(the_scf, tol)
+    reset!(the_optimizer)
+
+    iter::Integer      = 0
+    is_converged::Bool = false
+
+    while not(is_converged) && iter < max_iter
+        
+        is_converged   = next_step!(the_optimizer, e_tot)
+        mo_coff        = get_orb_coeff(the_scf)
+        density_matrix = build_density_matrix(the_scf, mo_coff)
+        fock_matrix    = build_fock_matrix(the_scf, density_matrix)
+        e_tot          = total_energy(the_scf, density_matrix, fock_matrix)
+        update!(
+            the_scf,
+            is_converged,
+            e_tot,
+            mo_coff,
+            density_matrix,
+            fock_matrix
+        )
+        iter += 1
+    end
 end
