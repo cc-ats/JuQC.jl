@@ -73,7 +73,7 @@ end
 
 function build_orbitals(the_scf::RestrictedSCFSolver{T}, fock_matrix::Array{T, 2}) where {T}
     ovlp_matrix = the_scf._fock_builder._ovlp
-    vals, vecs  = eigen(Hermitian(fock_matrix), Hermitian(ovlp_matrix))
+    vals, vecs  = eigen(fock_matrix, ovlp_matrix)
     return vals::Array{T,1}, vecs::Array{T,2}
 end
 
