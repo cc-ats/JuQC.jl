@@ -1,7 +1,7 @@
 abstract type FockBuilder end
 struct RestrictedFockBuilder{T} <: FockBuilder
-    _ovlp ::Array{T, 2}
-    _hcore::Array{T, 2}
+    _ovlp ::Hermitian{T,Array{T,2}}
+    _hcore::Hermitian{T,Array{T,2}}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
@@ -16,11 +16,25 @@ mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     _fock_builder  ::RestrictedFockBuilder{T}
 end
 
-function build_scf_solver(nelec::Tuple{Integer,Integer}, nbas::Integer, e_nuc::Real, s_matrix::Array{T, 2}, h_matrix::Array{T, 2}, eri::TwoElectronIntegralAO{T}) where {T}
-    num_elec      = nelec[1] * 2
-    fock_builder  = RestrictedFockBuilder{T}(s_matrix, h_matrix, eri)
-    the_scf       = RestrictedSCFSolver{T}(num_elec, div(num_elec,2), nbas, nbas, e_nuc, fock_builder)
-    return the_scf
+function build_scf_solver(
+    nbas::Integer, e_nuc::Real, nelec::Tuple{Integer,Integer},
+    s_matrix::Hermitian{T,Array{T,2}},
+    h_matrix::Hermitian{T,Array{T,2}},
+    eri::TwoElectronIntegralAO{T};
+    is_restricted::Bool=true
+    ) where {T}
+    if is_restricted
+        if nelec[1]==nelec[2]
+            num_elec      = nelec[1] + nelec[2]
+        else
+            error("RHF must be closed shell")
+        end
+        fock_builder  = RestrictedFockBuilder{T}(s_matrix, h_matrix, eri)
+        the_scf       = RestrictedSCFSolver{T}(num_elec, div(num_elec,2), nbas, nbas, e_nuc, fock_builder)
+        return the_scf
+    else
+
+    end
 end
 
 function get_nao(the_scf::RestrictedSCFSolver)
