@@ -5,7 +5,6 @@ abstract type OptimizationAlgorithm{T} end
 mutable struct RoothaanOptimizer{T} <: OptimizationAlgorithm{T}
     _the_obj_func::ObjectiveFunction{T}
 
-    _tol      ::Real
     _prev_y   ::Real
     _this_y   ::Real
     _grad_norm::Real

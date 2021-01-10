@@ -113,16 +113,16 @@ def main(g09file):
     logfile.close()
 
     if done_get_overlap:
-        np.savetxt(file_name + '/overlap.dat',overlap,fmt='% 12.8e',delimiter = ',')
+        np.savetxt(file_name + '/overlap.dat',overlap,fmt='% 20.12e',delimiter = ',')
     if done_get_ke:
-        np.savetxt(file_name + '/kinetic_energy.dat',ke_matrix,fmt='% 12.8e',delimiter = ',')
+        np.savetxt(file_name + '/kinetic_energy.dat',ke_matrix,fmt='% 20.12e',delimiter = ',')
     if done_get_pe:
-        np.savetxt(file_name + '/potential_energy.dat',pe_matrix,fmt='% 12.8e',delimiter = ',')
+        np.savetxt(file_name + '/potential_energy.dat',pe_matrix,fmt='% 20.12e',delimiter = ',')
     if done_get_eri:
-        np.savetxt(file_name + '/eri_val.dat',eri_val_array,fmt='% 12.8e',delimiter = ',')
+        np.savetxt(file_name + '/eri_val.dat',eri_val_array.T,fmt='% 20.12e',delimiter = ',')
         np.savetxt(file_name + '/eri_index.dat',eri_index_array,fmt='%d, %d, %d, %d',delimiter = ',')
         
-    np.savetxt(file_name + '/nuclear_repulsion.dat',np.array([enuc]),fmt='%12.8f')
+    np.savetxt(file_name + '/nuclear_repulsion.dat',np.array([enuc]),fmt='% 20.12f')
     np.savetxt(file_name + '/number_basis_functions.dat',np.array([nbf]),fmt='%d')
     np.savetxt(file_name + '/number_electrons.dat',np.array([nelec]),fmt='%d', delimiter = ',')
 

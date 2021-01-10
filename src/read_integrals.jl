@@ -22,7 +22,7 @@ function get_eri_index(lm::Integer, sgm::Integer, mu::Integer, nu::Integer)::Vec
         d = mu
     end
 
-    if a > c
+    if a > c || (a == c && b > d)
         return Vector{Integer}([a, b, c, d])
     else
         return Vector{Integer}([c, d, a, b])
@@ -60,13 +60,13 @@ function read_data(int_path::AbstractString; FloatType=Float64, IntType=Int)
     num_elec::Array{IntType, 2} = readdlm(num_elec_path, ',', IntType)
     nbas::IntType               = readdlm(nbas_path,     ',', IntType)[1]
 
-    return e_nuc, num_elec, nbas
+    return e_nuc, (num_elec[1], num_elec[2]), nbas
 end
 
 function read_ovlp(int_path::AbstractString; FloatType=Float64, IntType=Int)
     s_int_path                   = join(["./", int_path, "/overlap.dat"])
     s_matrix::Array{FloatType,2} = readdlm(s_int_path, ',', FloatType)
-    return s_matrix
+    return (s_matrix+transpose(s_matrix))/2
 end
 
 function read_hcore(int_path::AbstractString; FloatType=Float64)
@@ -74,7 +74,8 @@ function read_hcore(int_path::AbstractString; FloatType=Float64)
     v_int_path    = join(["./", int_path, "/potential_energy.dat"])
     t_matrix::Array{FloatType,2} = readdlm(t_int_path, ',', FloatType)
     v_matrix::Array{FloatType,2} = readdlm(v_int_path, ',', FloatType)
-    return t_matrix-v_matrix
+    h_matrix = t_matrix-v_matrix
+    return (h_matrix+transpose(h_matrix))/2
 end
 
 function read_eri(int_path::AbstractString; FloatType=Float64, IntType=Int)
@@ -82,5 +83,6 @@ function read_eri(int_path::AbstractString; FloatType=Float64, IntType=Int)
     eri_val_raw_path    = join(["./", int_path, "/eri_val.dat"])
     eri_index::Array{IntType,2} = readdlm(eri_index_raw_path, ',', IntType)
     eri_val::Array{FloatType}   = readdlm(eri_val_raw_path, ',', FloatType)
+
     return TwoElectronIntegralAO{FloatType}(eri_index, eri_val)
 end

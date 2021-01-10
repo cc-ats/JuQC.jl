@@ -1,3 +1,5 @@
+using Test
+
 include("../src/JuQC.jl")
 using .JuQC
 
@@ -20,6 +22,7 @@ println("hcore = ")
 display(hcore._data)
 for lm in 1:nbas
     for mu in 1:nbas
+        println("lm, mu = $lm, $mu")
         println("get_value(hcore, $lm, $mu) = ", get_value(hcore, lm, mu))
     end
 end
@@ -30,7 +33,10 @@ for lm in 1:nbas
     for mu in 1:nbas
         for sgm in 1:nbas
             for rho in 1:nbas
-                println("get_value(eri, $lm, $mu, $sgm, $rho) = ", get_value(eri, lm, mu, sgm, rho))
+                println("lm, mu, sgm, rho = $lm, $mu, $sgm, $rho")
+                @test get_value(eri, lm, mu, sgm, rho) == get_value(eri, sgm, rho, lm, mu)
+                @test get_value(eri, lm, mu, sgm, rho) == get_value(eri, mu, lm, sgm, rho)
+                @test get_value(eri, lm, mu, sgm, rho) == get_value(eri, lm, mu, rho, sgm)
             end
         end
     end
