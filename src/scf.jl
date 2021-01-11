@@ -5,16 +5,55 @@ struct RestrictedFockBuilder{T} <: FockBuilder
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-abstract type SCFSolver{T} <: ObjectiveFunction{T} end 
+struct UnrestrictedFockBuilder{T} <: FockBuilder
+    _ovlp ::Hermitian{T,Array{T,2}}
+    _hcore::Hermitian{T,Array{T,2}}
+    _eri  ::TwoElectronIntegralAO{T}
+end
+
+abstract type SCFSolver{T} end 
 mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     _nelec::Integer
     _nocc ::Integer
     _nao  ::Integer
     _nmo  ::Integer
     _e_nuc::Real
-
     _fock_builder  ::RestrictedFockBuilder{T}
+
+    _is_converged::Bool
+    _orb_coff::Array{T,2}
+    _orb_ene ::Array{T,1}
+    _density_matrix::Hermitian{T,Array{T,2}}
+    _fock_matrix   ::Hermitian{T,Array{T,2}}
 end
+
+mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
+    _nelec        ::Integer
+    _nocc         ::Integer
+    _nao          ::Integer
+    _nmo          ::Integer
+    _e_nuc        ::Real
+    _fock_builder ::UnrestrictedFockBuilder{T}
+
+    _is_converged  ::Bool
+    _orb_coff      ::Array{T,3}
+    _orb_ene       ::Array{T,2}
+    _density_matrix::Array{Hermitian{T,Array{T,2}},1}
+    _fock_matrix   ::Array{Hermitian{T,Array{T,2}},1}
+end
+
+abstract type SCFOptimizer{T}            <: ObjectiveFunction{T} end
+mutable struct RestrictedSCFOptimizer{T} <: ObjectiveFunction{T} 
+    _cur_energy::Real
+    _pre_energy::Real
+
+    _cur_grad::Real
+    _pre_grad::Real
+
+    _the_scf::RestrictedSCFSolver{T}
+end
+
+
 
 function build_scf_solver(
     nbas::Integer, e_nuc::Real, nelec::Tuple{Integer,Integer},
