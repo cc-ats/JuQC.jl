@@ -1,66 +1,78 @@
-abstract type FockBuilder end
-struct RestrictedFockBuilder{T} <: FockBuilder
+struct FockBuilder{T}
     _ovlp ::Hermitian{T,Array{T,2}}
     _hcore::Hermitian{T,Array{T,2}}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-struct UnrestrictedFockBuilder{T} <: FockBuilder
-    _ovlp ::Hermitian{T,Array{T,2}}
-    _hcore::Hermitian{T,Array{T,2}}
-    _eri  ::TwoElectronIntegralAO{T}
-end
-
-abstract type SCFSolver{T} end 
+abstract type SCFSolver{T}            <: ObjectiveFunction{T} end 
 mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
-    _nelec::Integer
-    _nocc ::Integer
-    _nao  ::Integer
-    _nmo  ::Integer
-    _e_nuc::Real
+    # input parameters
+    _nao           ::Integer
+    _nmo           ::Integer
+    _nelec         ::Integer
+    _nocc          ::Integer
+    _e_nuc         ::Real
     _fock_builder  ::RestrictedFockBuilder{T}
 
-    _is_converged::Bool
-    _orb_coff::Array{T,2}
-    _orb_ene ::Array{T,1}
-    _density_matrix::Hermitian{T,Array{T,2}}
-    _fock_matrix   ::Hermitian{T,Array{T,2}}
+    is_init_guess ::Bool
+    is_converged  ::Bool
+    orb_ene       ::Array{T,1}
+    orb_coff      ::Array{T,2}
+    density_matrix::Hermitian{T,Array{T,2}}
+    fock_matrix   ::Hermitian{T,Array{T,2}}
 end
 
 mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
-    _nelec        ::Integer
-    _nocc         ::Integer
     _nao          ::Integer
     _nmo          ::Integer
+    _nelec        ::Tuple{Integer,Integer}
+    _nocc         ::Tuple{Integer,Integer}
     _e_nuc        ::Real
     _fock_builder ::UnrestrictedFockBuilder{T}
 
-    _is_converged  ::Bool
-    _orb_coff      ::Array{T,3}
-    _orb_ene       ::Array{T,2}
-    _density_matrix::Array{Hermitian{T,Array{T,2}},1}
-    _fock_matrix   ::Array{Hermitian{T,Array{T,2}},1}
+    is_init_guess ::Bool
+    is_converged  ::Bool
+    orb_ene       ::Tuple{Array{T,1},Array{T,1}} 
+    orb_coff      ::Tuple{Array{T,2},Array{T,2}} 
+    density_matrix::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
+    fock_matrix   ::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
 end
 
-abstract type SCFOptimizer{T}            <: ObjectiveFunction{T} end
-mutable struct RestrictedSCFOptimizer{T} <: ObjectiveFunction{T} 
-    _cur_energy::Real
-    _pre_energy::Real
+function get_grad(the_scf::RestrictedSCFSolver{T})
+    s    = the_scf._fock_builder._ovlp
+    p    = the_scf.density_matrix
+    f    = the_scf.fock_matrix
 
-    _cur_grad::Real
-    _pre_grad::Real
+    fps  = f * p * s
+    grad = fps - transpose(fps)
 
-    _the_scf::RestrictedSCFSolver{T}
+    return grad
 end
 
+function get_grad(the_scf::UnrestrictedSCFSolver{T})
+    s     = the_scf._fock_builder._ovlp
+    pa    = the_scf.density_matrix[1]
+    fa    = the_scf.fock_matrix[1]
 
+    s     = the_scf._fock_builder._ovlp
+    pb    = the_scf.density_matrix[2]
+    fb    = the_scf.fock_matrix[2]
+
+    fps_a  = fa * pa * s
+    grad_a = fps_a - transpose(fps_a)
+
+    fps_b  = fb * pb * s
+    grad_b = fps_b - transpose(fps_b)
+    
+    return (grad_a, grad_b)
+end
 
 function build_scf_solver(
     nbas::Integer, e_nuc::Real, nelec::Tuple{Integer,Integer},
-    s_matrix::Hermitian{T,Array{T,2}},
-    h_matrix::Hermitian{T,Array{T,2}},
+    ovlp::Hermitian{T,Array{T,2}},
+    hcore::Hermitian{T,Array{T,2}},
     eri::TwoElectronIntegralAO{T};
-    is_restricted::Bool=true
+    is_restricted::Bool=true, 
     ) where {T}
     if is_restricted
         if nelec[1]==nelec[2]

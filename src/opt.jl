@@ -5,9 +5,16 @@ abstract type OptimizationAlgorithm{T} end
 mutable struct RoothaanOptimizer{T} <: OptimizationAlgorithm{T}
     _the_obj_func::ObjectiveFunction{T}
 
-    _prev_y   ::Real
-    _this_y   ::Real
-    _grad_norm::Real
+    _cur_y::Real
+    _pre_y::Real
+
+    _cur_grad::Array{T,1}
+    _pre_grad::Array{T,1}
+
+    _cur_x::Array{T,1}
+    _pre_x::Array{T,1}
+
+    _the_scf::RestrictedSCFSolver{T}
 end
 
 function next_step!(the_optimizer::RoothaanOptimizer{T}, this_y::T) where {T}
