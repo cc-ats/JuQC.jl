@@ -1,35 +1,30 @@
 abstract type ObjectiveFunction{T} end 
 
+function get_value(the_scf::RestrictedSCFSolver{T})
+    return the_scf.energy_elec
+end
+
+function get_grad(the_scf::RestrictedSCFSolver{T})
+    return the_scf.grad
+end
+
 abstract type OptimizationAlgorithm{T} end
+function init_opt_algo!(the_opt::OptimizationAlgorithm{T}, the_obj_func::ObjectiveFunction{T}) where {T}
+    
+end
 
 mutable struct RoothaanOptimizer{T} <: OptimizationAlgorithm{T}
-    _the_obj_func::ObjectiveFunction{T}
-
-    _cur_y::Real
-    _pre_y::Real
-
-    _cur_grad::Array{T,1}
-    _pre_grad::Array{T,1}
-
-    _cur_x::Array{T,1}
-    _pre_x::Array{T,1}
-
-    _the_scf::RestrictedSCFSolver{T}
+    obj_func::Union{Nothing, ObjectiveFunction{T}}
+    function RoothaanOptimizer()
+        return RoothaanOptimizer{T}(nothing)
+    end
 end
 
-function next_step!(the_optimizer::RoothaanOptimizer{T}, this_y::T) where {T}
-    the_optimizer._prev_y    = the_optimizer._this_y
-    the_optimizer._this_y    = this_y
-
-    grad_size                = sizeof(the_optimizer._grad_norm)
-    the_optimizer._grad_norm = norm(get_grad(the_optimizer._the_obj_func))/sqrt(grad_size)
-    
-    is_wolfe1 = abs(_this_y-_prev_y)     < the_optimizer._tol
-    is_wolfe2 = the_optimizer._grad_norm < the_optimizer._tol
-
-    return is_wolfe1 && is_wolfe2
+function next_step!(the_optimizer::RoothaanOptimizer{T}) where {T}
+    return true
 end
 
-struct DIISOptimizer{T}     <: OptimizationAlgorithm{T}
-    tol::Number
+struct DIISOptimizer{T} <: OptimizationAlgorithm{T}
+    obj_func::Union{Nothing, ObjectiveFunction{T}}
+    num_sub_space::Integer
 end
