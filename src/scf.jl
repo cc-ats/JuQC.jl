@@ -1,21 +1,26 @@
-struct FockBuilder{T}
+abstract type FockBuilder{T} end
+
+mutable struct RestrictedFockBuilder{T} <: FockBuilder{T}
     _nao  ::Integer
     _ovlp ::Hermitian{T,Array{T,2}}
     _hcore::Hermitian{T,Array{T,2}}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-function get_eri_value(the_fock_builder::FockBuilder{T}, lm::Integer, sgm::Integer, mu::Integer, nu::Integer) where {T}
+function get_eri_value(the_fock_builder::RestrictedFockBuilder{T}, lm::Integer, sgm::Integer, mu::Integer, nu::Integer) where {T}
     return get_value(the_fock_builder._eri, lm, sgm, mu, nu)::T
 end
 
-function build_fock_matrix(the_fock_builder::FockBuilder{T}, dm::Hermitian{T,Array{T,2}}) where {T}
+function build_fock_matrix(
+    the_fock_builder::RestrictedFockBuilder{T},
+    dm_tot::Hermitian{T,Array{T,2}},
+    dm_alpha::Hermitian{T,Array{T,2}},
+    dm_beta::Hermitian{T,Array{T,2}}
+    ) where {T}
     nao    = the_fock_builder._nao
     hcore  = the_fock_builder._fock_builder._hcore
     jmat   = zeros(T, nao, nao)
     kmat   = zeros(T, nao, nao)
-    dm_tot            = get_dm_tot(the_fock_builder,  dm)
-    dm_alpha, dm_beta = get_dm_spin(the_fock_builder, dm)
 
     for lm in 1:nao
         for sgm in 1:nao
@@ -37,18 +42,21 @@ mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     # input parameters
     _nao           ::Integer
     _nmo           ::Integer
-    _nelec         ::Integer
     _nocc          ::Integer
     _e_nuc         ::Real
     _fock_builder  ::RestrictedFockBuilder{T}
 
     is_init_guess ::Bool
     is_converged  ::Bool
+    num_fock_build::Integer
+
     energy_tot    ::Real
     energy_elec   ::Real
+
     orb_ene       ::Array{T,1}
     orb_coff      ::Array{T,2}
     grad          ::Array{T,2}
+
     density_matrix::Hermitian{T,Array{T,2}}
     fock_matrix   ::Hermitian{T,Array{T,2}}
 end
@@ -56,7 +64,6 @@ end
 mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
     _nao          ::Integer
     _nmo          ::Integer
-    _nelec        ::Tuple{Integer,Integer}
     _nocc         ::Tuple{Integer,Integer}
     _e_nuc        ::Real
     _fock_builder ::UnrestrictedFockBuilder{T}
@@ -73,7 +80,8 @@ mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
 end
 
 function build_scf_solver(
-    nbas::Integer, e_nuc::Real, nelec::Tuple{Integer,Integer},
+    nao::Integer, e_nuc::Real,
+    nelec::Tuple{Integer,Integer},
     ovlp::Hermitian{T,Array{T,2}},
     hcore::Hermitian{T,Array{T,2}},
     eri::TwoElectronIntegralAO{T};
@@ -81,15 +89,17 @@ function build_scf_solver(
     ) where {T}
     if is_restricted
         if nelec[1]==nelec[2]
-            num_elec      = nelec[1] + nelec[2]
+            num_elec = nelec[1] + nelec[2]
         else
             error("RHF must be closed shell")
         end
-        fock_builder  = RestrictedFockBuilder{T}(s_matrix, h_matrix, eri)
-        the_scf       = RestrictedSCFSolver{T}(num_elec, div(num_elec,2), nbas, nbas, e_nuc, fock_builder)
+        fock_builder  = RestrictedFockBuilder{T}(ovlp, hcore, eri)
+        the_scf       = RestrictedSCFSolver{T}(
+            num_elec, div(num_elec,2), nao, nao, e_nuc, fock_builder
+            )
         return the_scf
     else
-
+        error("Not implemented!")
     end
 end
 
@@ -207,7 +217,7 @@ end
 
 function kernel(the_scf::RestrictedSCFSolver{T};
     max_iter::Integer=100, tol::Number=1e-8,
-    the_opt::OptimizationAlgorithm=RoothaanOptimizer(nothing)
+    the_opt::OptimizationAlgorithm=RoothaanOptimizer()
     ) where {T}
     
     if the_scf.is_init_guess
@@ -226,7 +236,9 @@ function kernel(the_scf::RestrictedSCFSolver{T};
     pre_e_elec = zero(T)
     cur_e_elec = e_elec
 
-    init_opt_algo!(the_opt, the_scf)
+    if not(the_opt._is_initialized)
+        init_opt_algo!(the_opt, the_scf)
+    end
 
     iter::Integer      = 1
     is_converged::Bool = false
