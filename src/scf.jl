@@ -183,6 +183,8 @@ function build_fock_matrix(
     end
 
     fock = hcore + jmat - kmat
+    the_scf.num_fock_build += 1
+
     return Hermitian(fock::Array{T,2})
 end
 
@@ -263,7 +265,7 @@ function kernel!(the_scf::RestrictedSCFSolver{T};
         fock_matrix       = build_fock_matrix(the_scf, density_matrix)
         orb_ene, orb_coff = build_orbitals(the_scf, fock_matrix)
         grad_norm, grad   = get_grad(the_scf,   fock_matrix, density_matrix)
-        
+
         density_matrix    = build_density_matrix(the_scf, orb_coff)
         e_elec            = get_e_elec(the_scf, fock_matrix, density_matrix)
 
@@ -272,8 +274,6 @@ function kernel!(the_scf::RestrictedSCFSolver{T};
         ene_err      = abs(cur_e_elec - pre_e_elec)
         grad_err     = grad_norm
         err          = max(grad_norm, ene_err)
-        println("grad_norm = ", grad_norm)
-        println("ene_err   = ", ene_err)
         is_converged = err < tol
 
         e_tot = e_elec  + the_scf._e_nuc
@@ -282,4 +282,5 @@ function kernel!(the_scf::RestrictedSCFSolver{T};
         @printf("%5d%19.10f%14.2e\n", iter, e_tot, err)
         iter += 1
     end
+    println("NFock = ", the_scf.num_fock_build)
 end
