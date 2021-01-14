@@ -33,10 +33,11 @@ function get_value(two_elec_int::TwoElectronIntegralAO{T}, lm::Integer, sgm::Int
     eri_index = get_eri_index(lm, sgm, mu, nu)::Vector{Integer}
     tmp_val   = zero(T)
 
+    is_index_in_two_elec_int = false
     for i in 1:size(two_elec_int._index,1)
-        if two_elec_int._index[i,:] == eri_index
-            tmp_val = two_elec_int._data[i]::T
-            is_index_in_two_elec_int = true
+        @inbounds is_index_in_two_elec_int = (two_elec_int._index[i,:] == eri_index)
+        if is_index_in_two_elec_int
+            @inbounds tmp_val = two_elec_int._data[i]::T
             break
         end
     end

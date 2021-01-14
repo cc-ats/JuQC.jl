@@ -1,7 +1,7 @@
 include("../src/JuQC.jl")
 using .JuQC
 
-int_path = "LiH_STO3G"
+int_path = "H2O_STO3G"
 e_nuc, num_elec, nbas = read_data(int_path)
 ovlp  = read_ovlp(int_path)
 hcore = read_hcore(int_path)

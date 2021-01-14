@@ -1,11 +1,14 @@
 mutable struct FockBuilder{T}
+    num_fock_build ::Integer
+    time_fock_build::Real
+
     _nao  ::Integer
     _ovlp ::Hermitian{T,Array{T,2}}
     _hcore::Hermitian{T,Array{T,2}}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-abstract type SCFSolver{T}            <: ObjectiveFunction{T} end 
+abstract type  SCFSolver{T}           <: ObjectiveFunction{T} end 
 mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     # input parameters
     _nao           ::Integer
@@ -17,7 +20,6 @@ mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     # parameters
     is_init_guess ::Bool
     is_converged  ::Bool
-    num_fock_build::Integer
 
     # results
     energy_tot    ::Real
@@ -40,7 +42,6 @@ mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
 
     is_init_guess ::Bool
     is_converged  ::Bool
-    num_fock_build::Integer
 
     energy_tot    ::Real
     energy_elec   ::Real
@@ -66,10 +67,10 @@ function build_scf_solver(
         if not(nelec[1]==nelec[2])
             error("RHF must be closed shell")
         end
-        fock_builder  = FockBuilder{T}(nao, ovlp, hcore, eri)
+        fock_builder  = FockBuilder{T}(0, 0.0, nao, ovlp, hcore, eri)
         the_scf       = RestrictedSCFSolver{T}(
             nao, nao, nelec[1], e_nuc, fock_builder,
-            false, false, 0, 0.0, 0.0,
+            false, false, 0.0, 0.0,
             zeros(T, nao), zeros(T, nao, nao), zeros(T, nao, nao),
             Hermitian(zeros(T, nao, nao)), Hermitian(zeros(T, nao, nao))
             )
@@ -163,6 +164,7 @@ function build_fock_matrix(
     dm_tot            = get_density_matrix_tot(the_scf::RestrictedSCFSolver{T},  dm)
     dm_alpha, dm_beta = get_density_matrix_spin(the_scf::RestrictedSCFSolver{T}, dm)
 
+    t0 = time()
     jmat   = zeros(T, nao, nao)
     kmat   = zeros(T, nao, nao)
 
@@ -170,11 +172,11 @@ function build_fock_matrix(
         for sgm in 1:nao
             for mu in 1:nao
                 for nu in 1:nao
-                    jmat[lm, sgm] += get_value(
+                    @inbounds jmat[lm, sgm] += get_value(
                         the_scf._fock_builder._eri, lm, sgm, mu, nu
                         ) * dm_tot[nu, mu]
 
-                    kmat[lm, sgm] += get_value(
+                    @inbounds kmat[lm, sgm] += get_value(
                         the_scf._fock_builder._eri, lm, mu, sgm, nu
                         ) * dm_alpha[nu, mu]
                 end
@@ -183,7 +185,8 @@ function build_fock_matrix(
     end
 
     fock = hcore + jmat - kmat
-    the_scf.num_fock_build += 1
+    the_scf._fock_builder.num_fock_build  += 1
+    the_scf._fock_builder.time_fock_build += time() - t0
 
     return Hermitian(fock::Array{T,2})
 end
@@ -231,7 +234,7 @@ end
 
 function kernel!(the_scf::RestrictedSCFSolver{T};
     max_iter::Integer=100, tol::Number=1e-8,
-    the_opt::OptimizationAlgorithm{T}=RoothaanOptimizer{T}(false, nothing)
+    the_opt::OptimizationAlgorithm=RoothaanOptimizer(T=T)
     ) where {T}
     
     if the_scf.is_init_guess
@@ -282,5 +285,6 @@ function kernel!(the_scf::RestrictedSCFSolver{T};
         @printf("%5d%19.10f%14.2e\n", iter, e_tot, err)
         iter += 1
     end
-    println("NFock = ", the_scf.num_fock_build)
+    println("Number of Fock Build = ", the_scf._fock_builder.num_fock_build)
+    println("Time   of Fock Build = ", the_scf._fock_builder.time_fock_build)
 end
