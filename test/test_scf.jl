@@ -8,4 +8,4 @@ hcore = read_hcore(int_path)
 eri   = read_eri(int_path)
 
 the_scf = build_scf_solver(nbas, e_nuc, num_elec, ovlp, hcore, eri, is_restricted=true)
-kernel!(the_scf, max_iter=200, tol=1e-8, the_opt=Roothaan())
+kernel!(the_scf, max_iter=200, tol=1e-8, scf_algo=Roothaan())
