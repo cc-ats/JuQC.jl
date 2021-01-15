@@ -1,20 +1,17 @@
 mutable struct FockBuilder{T}
-    num_fock_build ::Integer
-    time_fock_build::Real
-
     _nao  ::Integer
     _ovlp ::Hermitian{T,Array{T,2}}
     _hcore::Hermitian{T,Array{T,2}}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
-abstract type  SCFSolver{T}           <: ObjectiveFunction{T} end 
-mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
+abstract type  SCFSolver{T} end 
+mutable struct RestrictedSCFSolver{T}  <: SCFSolver{T}
     # input parameters
     _nao           ::Integer
     _nmo           ::Integer
     _nocc          ::Integer
-    _e_nuc         ::Real
+    _e_nuc         ::real(T)
     _fock_builder  ::FockBuilder{T}
 
     # parameters
@@ -22,8 +19,11 @@ mutable struct RestrictedSCFSolver{T} <: SCFSolver{T}
     is_converged  ::Bool
 
     # results
-    energy_tot    ::Real
-    energy_elec   ::Real
+    num_fock_build ::Integer
+    time_fock_build::real(T)
+
+    energy_tot    ::real(T)
+    energy_elec   ::real(T)
 
     orb_ene       ::Array{T,1}
     orb_coff      ::Array{T,2}
@@ -37,14 +37,48 @@ mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
     _nao          ::Integer
     _nmo          ::Integer
     _nocc         ::Tuple{Integer,Integer}
-    _e_nuc        ::Real
+    _e_nuc        ::real(T)
     _fock_builder ::FockBuilder{T}
 
     is_init_guess ::Bool
     is_converged  ::Bool
 
-    energy_tot    ::Real
-    energy_elec   ::Real
+    num_fock_build ::Integer
+    time_fock_build::real(T)
+
+    energy_tot    ::real(T)
+    energy_elec   ::real(T)
+
+    orb_ene       ::Tuple{Array{T,1},Array{T,1}} 
+    orb_coff      ::Tuple{Array{T,2},Array{T,2}}
+    grad          ::Tuple{Array{T,2},Array{T,2}}
+
+    density_matrix::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
+    fock_matrix   ::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
+end
+
+abstract type  SCFResult{T} end 
+mutable struct RestrictedSCFResult{T} <: SCFResult{T}
+    is_converged  ::Bool
+
+    # results
+    energy_tot    ::real(T)
+    energy_elec   ::real(T)
+
+    orb_ene       ::Array{T,1}
+    orb_coff      ::Array{T,2}
+    grad          ::Array{T,2}
+
+    density_matrix::Hermitian{T,Array{T,2}}
+    fock_matrix   ::Hermitian{T,Array{T,2}}
+end
+
+struct UnrestrictedSCFResult{T}       <: SCFResult{T}
+    is_converged  ::Bool
+
+    # results
+    energy_tot    ::real(T)
+    energy_elec   ::real(T)
 
     orb_ene       ::Tuple{Array{T,1},Array{T,1}} 
     orb_coff      ::Tuple{Array{T,2},Array{T,2}}
@@ -55,7 +89,7 @@ mutable struct UnrestrictedSCFSolver{T} <: SCFSolver{T}
 end
 
 function build_scf_solver(
-    nao::Integer, e_nuc::Real,
+    nao::Integer, e_nuc::real(T),
     nelec::Tuple{Integer,Integer},
     ovlp::Hermitian{T,Array{T,2}},
     hcore::Hermitian{T,Array{T,2}},
@@ -67,10 +101,10 @@ function build_scf_solver(
         if not(nelec[1]==nelec[2])
             error("RHF must be closed shell")
         end
-        fock_builder  = FockBuilder{T}(0, 0.0, nao, ovlp, hcore, eri)
+        fock_builder  = FockBuilder{T}(nao, ovlp, hcore, eri)
         the_scf       = RestrictedSCFSolver{T}(
             nao, nao, nelec[1], e_nuc, fock_builder,
-            false, false, 0.0, 0.0,
+            false, false, 0, 0.0, 0.0, 0.0,
             zeros(T, nao), zeros(T, nao, nao), zeros(T, nao, nao),
             Hermitian(zeros(T, nao, nao)), Hermitian(zeros(T, nao, nao))
             )
@@ -114,25 +148,15 @@ end
 
 function get_e_elec(the_scf::RestrictedSCFSolver{T}, f::Hermitian{T,Array{T,2}}, p::Hermitian{T,Array{T,2}}) where {T}
     h      = the_scf._fock_builder._hcore
-    tmp    = f + h
-    return real(dot(p, tmp)/2)::Real
+    return real(dot(p, f + h)/2)::real(T)
 end
 
 function get_grad(the_scf::RestrictedSCFSolver{T}, f::Hermitian{T,Array{T,2}}, p::Hermitian{T,Array{T,2}}) where {T}
-    nao  = get_nao(the_scf)
     s    = the_scf._fock_builder._ovlp
     fps  = f * p * s
     g    = fps - transpose(fps)
-    n    = norm(g)/nao
-    return n::Real, g::Array{T,2}
-end
-
-function get_value(the_scf::RestrictedSCFSolver{T}) where {T}
-    return the_scf.energy_elec::Real
-end
-
-function get_grad(the_scf::RestrictedSCFSolver{T}) where {T}
-    return the_scf.grad::Array{T, 1}
+    n    = norm(g)
+    return n::real(T), g::Array{T,2}
 end
 
 function build_orbitals(the_scf::RestrictedSCFSolver{T}, fock_matrix::Hermitian{T,Array{T,2}}) where {T}
@@ -185,36 +209,42 @@ function build_fock_matrix(
     end
 
     fock = hcore + jmat - kmat
-    the_scf._fock_builder.num_fock_build  += 1
-    the_scf._fock_builder.time_fock_build += time() - t0
+    the_scf.num_fock_build  += 1
+    the_scf.time_fock_build += time() - t0
 
     return Hermitian(fock::Array{T,2})
 end
 
 function set_init_guess!(
     the_scf::RestrictedSCFSolver{T}, 
-    is_orb_coeff::Bool, tmp::Array{T,2}
+    tmp::Array{T,2};
+    is_orb_coeff::Bool=true, is_density_matrix::Bool=false
     ) where {T}
-    nao = the_scf._nao
+    nao = get_nao(the_scf)
+    nmo = get_nmo(the_scf)
 
-    if not(sizeof(tmp) == (nao, nao))
-        error("Wrong init guess dimension!!!")
-    end
-
-    if is_orb_coeff
+    if is_orb_coeff && not(is_density_matrix)
+        if not(sizeof(tmp) == (nao, nmo))
+            error("Wrong init guess dimension!!!")
+        end
         the_scf.is_init_guess  = true
-        the_scf.density_matrix = build_density_matrix(the_scf, tmp_array)
+        the_scf.density_matrix = build_density_matrix(the_scf, tmp)
+    else if not(is_orb_coeff) && is_density_matrix
+        if not(sizeof(tmp) == (nao, nao))
+            error("Wrong init guess dimension!!!")
+        end
+        the_scf.is_init_guess  = true
+        the_scf.density_matrix = Hermitian(tmp)
     else
-        the_scf.is_init_guess  = true
-        the_scf.density_matrix = Hermitian(tmp_array)
+        error("Unknown init guess type!!!")
     end
 end
 
 function update!(
     the_scf       ::RestrictedSCFSolver{T},
     is_converged  ::Bool,
-    energy_tot    ::Real,
-    energy_elec   ::Real,
+    energy_tot    ::real(T),
+    energy_elec   ::real(T),
     orb_ene       ::Array{T,1},
     orb_coff      ::Array{T,2},
     grad          ::Array{T,2},
@@ -232,45 +262,46 @@ function update!(
     the_scf.fock_matrix    = fock_matrix
 end
 
-function kernel!(the_scf::RestrictedSCFSolver{T};
+function kernel!(
+    the_scf::RestrictedSCFSolver{T};
     max_iter::Integer=100, tol::Number=1e-8,
-    the_opt::OptimizationAlgorithm=RoothaanOptimizer(T=T)
+    scf_algo::SCFAlgorithm=Roothaan(T=T)
     ) where {T}
     
     if the_scf.is_init_guess
-        init_dm           = the_scf.density_matrix
-        fock_matrix       = build_fock_matrix(the_scf,  init_dm)
-        orb_ene, orb_coff = build_orbitals(the_scf, fock_matrix)
-        density_matrix    = build_density_matrix(the_scf, orb_coff)
+        init_dm              = the_scf.density_matrix
+        init_fock            = build_fock_matrix(the_scf,   init_dm)
+        init_norm, init_grad = get_grad(the_scf, init_fock, init_dm)
     else
-        hmat               = the_scf._fock_builder._hcore
-        orb_ene, orb_coff  = build_orbitals(the_scf, hmat)
-        density_matrix     = build_density_matrix(the_scf, orb_coff)
-        fock_matrix        = build_fock_matrix(the_scf, density_matrix)
+        hcore                = the_scf._fock_builder._hcore
+        init_orb_ene, init_orb_coff  = build_orbitals(the_scf, hcore)
+        init_dm              = build_density_matrix(the_scf, init_orb_coff)
+        init_fock            = build_fock_matrix(the_scf,   init_dm)
+        init_norm, init_grad = get_grad(the_scf, init_fock, init_dm)
     end
 
-    e_elec  = get_e_elec(the_scf, fock_matrix, density_matrix)
+    e_elec     = get_e_elec(the_scf, fock_matrix, density_matrix)
     pre_e_elec = zero(T)
     cur_e_elec = e_elec
 
-    if not(the_opt._is_initialized)
-        init_opt_algo!(the_opt, the_scf)
+    if not(scf_algo._is_initialized)
+        init_scf_algo!(scf_algo, the_scf, init_fock, init_dm)
     end
 
     iter::Integer      = 1
     is_converged::Bool = false
 
     while not(is_converged) && iter < max_iter
-        is_opt_converged  = next_step!(the_opt)
+        is_scf_algo_converged  = next_step!(scf_algo)
         if (iter > 1)
-            density_matrix    = get_density_matrix(the_opt)
+            density_matrix     = get_density_matrix(scf_algo)
         end
         fock_matrix       = build_fock_matrix(the_scf, density_matrix)
         orb_ene, orb_coff = build_orbitals(the_scf, fock_matrix)
         grad_norm, grad   = get_grad(the_scf,   fock_matrix, density_matrix)
 
-        density_matrix    = build_density_matrix(the_scf, orb_coff)
-        e_elec            = get_e_elec(the_scf, fock_matrix, density_matrix)
+        new_density_matrix  = build_density_matrix(the_scf, orb_coff)
+        e_elec              = get_e_elec(the_scf, fock_matrix, density_matrix)
 
         pre_e_elec   = cur_e_elec
         cur_e_elec   = e_elec
@@ -287,4 +318,6 @@ function kernel!(the_scf::RestrictedSCFSolver{T};
     end
     println("Number of Fock Build = ", the_scf._fock_builder.num_fock_build)
     println("Time   of Fock Build = ", the_scf._fock_builder.time_fock_build)
+    
+    return RestrictedSCFResult{T}(is_converged, e_tot, e_elec, orb_ene, orb_coff, grad, density_matrix, fock_matrix, )
 end
