@@ -34,4 +34,22 @@ function TwoElectronIntegralMO(the_scf::RestrictedSCFSolver{T,RealType}) where {
         for p in 1:nmo
             @inbounds temp[:, :, :, p] += coeff[mu, p] * temp_int[:,:,:,mu]
             for nu in 1:nao
+                for q in 1:nmo
+                    @inbounds temp2[:,:,q,p] += coeff[nu, q] * temp[:,:,nu,mu]
+                    for lm in 1:nao
+                        for r in 1:nmo
+                            @inbounds temp3[:,r,q,p] += coeff[lm, r] * temp[:,lm,nu,mu]
+                            for sg in 1:nao
+                                for s in 1:nmo
+                                    @inbounds eri_mo[s,r,q,p] += coeff[sg, s] * temp[sg,lm,nu,mu]
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    
 end

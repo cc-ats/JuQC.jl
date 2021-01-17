@@ -5,6 +5,43 @@ struct FockBuilder{T}
     _eri  ::TwoElectronIntegralAO{T}
 end
 
+abstract type  SCFResult{T,RealType<:Real} end 
+struct RestrictedSCFResult{T,RealType} <: SCFResult{T,RealType}
+    nao           ::Integer
+    nmo           ::Integer
+    nocc          ::Integer
+    e_nuc         ::RealType
+    fock_builder  ::FockBuilder{T}
+
+    is_converged  ::Bool
+
+    # results
+    energy_tot    ::RealType
+    energy_elec   ::RealType
+
+    orb_ene       ::Array{RealType,1}
+    orb_coeff     ::Array{T,2}
+    grad          ::Array{T,2}
+
+    density_matrix::Hermitian{T,Array{T,2}}
+    fock_matrix   ::Hermitian{T,Array{T,2}}
+end
+
+struct UnrestrictedSCFResult{T,RealType}      <: SCFResult{T,RealType}
+    is_converged  ::Bool
+
+    # results
+    energy_tot    ::RealType
+    energy_elec   ::RealType
+
+    orb_ene       ::Tuple{Array{RealType,1},Array{RealType,1}} 
+    orb_coeff     ::Tuple{Array{T,2},Array{T,2}}
+    grad          ::Tuple{Array{T,2},Array{T,2}}
+
+    density_matrix::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
+    fock_matrix   ::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
+end
+
 abstract type  SCFSolver{T,RealType<:Real} end 
 mutable struct RestrictedSCFSolver{T,RealType} <: SCFSolver{T,RealType}
     # input parameters
@@ -52,37 +89,6 @@ mutable struct UnrestrictedSCFSolver{T, RealType} <: SCFSolver{T,RealType}
     orb_ene        ::Tuple{Array{RealType,1},Array{RealType,1}} 
     orb_coeff      ::Tuple{Array{T,2},Array{T,2}}
     grad           ::Tuple{Array{T,2},Array{T,2}}
-
-    density_matrix::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
-    fock_matrix   ::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
-end
-
-abstract type  SCFResult{T,RealType<:Real} end 
-mutable struct RestrictedSCFResult{T,RealType} <: SCFResult{T,RealType}
-    is_converged  ::Bool
-
-    # results
-    energy_tot    ::RealType
-    energy_elec   ::RealType
-
-    orb_ene       ::Array{RealType,1}
-    orb_coeff     ::Array{T,2}
-    grad          ::Array{T,2}
-
-    density_matrix::Hermitian{T,Array{T,2}}
-    fock_matrix   ::Hermitian{T,Array{T,2}}
-end
-
-struct UnrestrictedSCFResult{T,RealType}      <: SCFResult{T,RealType}
-    is_converged  ::Bool
-
-    # results
-    energy_tot    ::RealType
-    energy_elec   ::RealType
-
-    orb_ene       ::Tuple{Array{RealType,1},Array{RealType,1}} 
-    orb_coeff     ::Tuple{Array{T,2},Array{T,2}}
-    grad          ::Tuple{Array{T,2},Array{T,2}}
 
     density_matrix::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
     fock_matrix   ::Tuple{Hermitian{T,Array{T,2}},Hermitian{T,Array{T,2}}}
