@@ -27,7 +27,7 @@ function build_eri_mo(the_scf::RestrictedSCFResult{T,RealType}) where {T,RealTyp
     end
 
     t0 = time()
-
+    
     temp1  = zeros(T, nao,nao,nao,nmo)
     temp2  = zeros(T, nao,nao,nmo,nmo)
     temp3  = zeros(T, nao,nmo,nmo,nmo)
