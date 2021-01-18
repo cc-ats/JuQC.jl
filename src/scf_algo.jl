@@ -15,7 +15,7 @@ function init_scf_algo!(
     density_matrix::Hermitian{T,Array{T,2}},
     fock_matrix   ::Hermitian{T,Array{T,2}},
     orb_ene       ::Array{RealType,1},
-    orb_coeff     ::Array{T,2},
+    orb_coeff     ::Array{T,2}
     ) where {T,RealType}
     if isnothing(scf_algo._the_scf) && not(scf_algo._is_initialized)
         the_scf.density_matrix   = density_matrix
@@ -212,6 +212,8 @@ function kernel!(
     println("Time   of Fock Build = ", the_scf.time_fock_build)
     
     return RestrictedSCFResult{T,RealType}(
+        the_scf._nao, the_scf._nmo, the_scf._nocc,
+        the_scf._e_nuc, the_scf._fock_builder,
         is_converged, e_tot, e_elec,
         orb_ene, orb_coeff, grad,
         density_matrix, fock_matrix

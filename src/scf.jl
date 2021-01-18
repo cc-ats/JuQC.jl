@@ -27,6 +27,38 @@ struct RestrictedSCFResult{T,RealType} <: SCFResult{T,RealType}
     fock_matrix   ::Hermitian{T,Array{T,2}}
 end
 
+function get_nao(the_scf::RestrictedSCFResult)
+    return the_scf.nao::Integer
+end
+
+function get_nmo(the_scf::RestrictedSCFResult)
+    return the_scf.nmo::Integer
+end
+
+function get_nocc(the_scf::RestrictedSCFResult)
+    return the_scf.nocc
+end
+
+function get_nvir(the_scf::RestrictedSCFResult)
+    return the_scf.nmo - the_scf.nocc
+end
+
+function get_occ_index(the_scf::RestrictedSCFResult)
+    return (1:the_scf.nocc)
+end
+
+function get_vir_index(the_scf::RestrictedSCFResult)
+    return ((the_scf.nocc+1):(the_scf.nmo))
+end
+
+function get_orb_ene(the_scf::RestrictedSCFResult{T,RealType}) where {T,RealType}
+    return the_scf.orb_ene::Array{RealType,1}
+end
+
+function get_orb_coeff(the_scf::RestrictedSCFResult{T,RealType}) where {T,RealType}
+    return the_scf.orb_coeff::Array{T,2}
+end
+
 struct UnrestrictedSCFResult{T,RealType}      <: SCFResult{T,RealType}
     is_converged  ::Bool
 

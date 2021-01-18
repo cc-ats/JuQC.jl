@@ -11,7 +11,7 @@ the_scf    = build_scf_solver(nbas, e_nuc, num_elec, ovlp, hcore, eri, is_restri
 scf_result = kernel!(the_scf, max_iter=200, tol=1e-8, scf_algo=DIIS(T=Float64))
 
 println("\n#########################################")
-println("sis_converged = ", scf_result.is_converged)
+println("scf_converged = ", scf_result.is_converged)
 println("energy_tot  = ", scf_result.energy_tot)
 println("energy_elec = ", scf_result.energy_elec)
 println("#########################################")
